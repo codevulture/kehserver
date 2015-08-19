@@ -78,7 +78,7 @@ skip_files: |
  (gluon/tests/.*)|
  (gluon/rocket\.py)|
  (contrib/(gateways|markdown|memcache|pymysql)/.*)|
- (contrib/(populate|taskbar_widget)\.py)|
+ (contrib/(taskbar_widget)\.py)|
  (google_appengine/.*)|
  (.*\.(bak|orig))|
  )$

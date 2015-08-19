@@ -42,3 +42,23 @@ db.define_table('trending_board', Field('region', 'string', required=True),
 db.define_table('discover', Field('region', 'string', required=True),
                 Field('index_i', 'integer', required=True),
                 Field('vedio', db.video, required=True))
+
+def getVideo(videos, user):
+    favtag = [f.video for f in db(db.favriouts.user_d == user).select()]
+    row = db(db.video.id.belongs(videos)).select(db.video.id, db.video.name, db.video.desc)
+    return gluon.contrib.simplejson.dumps({'video_list':[{'id': r.id, 'video_title': r.name, 'user': r.user_d, \
+                                                          'fav' : True if r.id in favtag else False, \
+                                                          'thumbnail': db.video.thumbnail.retrieve(r.thumbnail)[1].read()} for r in row]})
+
+def getBoards(boards):
+    row = db(db.video_board.id.belongs(boards)).select()
+    return gluon.contrib.simplejson.dumps({'board_list':[{'board_id': r.id, 'board_name': r.board_name, 'board_icon_id' : r.icon_id} for r in row]})
+
+def returnResultTrue():
+    return gluon.contrib.simplejson.dumps({'result': True})
+
+def returnResultFalse():
+    return gluon.contrib.simplejson.dumps({'result': False})
+
+def returnUser(user):
+    return gluon.contrib.simplejson.dumps({'result': True, 'username' : user.username, 'useremail': user.email})

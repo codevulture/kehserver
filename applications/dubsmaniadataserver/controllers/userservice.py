@@ -2,7 +2,6 @@
 # try something like
 import gluon.contenttype
 import datetime
-import json
 
 def user():
     """
@@ -30,10 +29,11 @@ def register():
     row = db.auth_user(username = username)
     if not row:
         user = db.auth_user.validate_and_insert(username = username, password = password, email = email, dob = dob)
-	if not user.id == None:
-            return gluon.contrib.simplejson.dumps({'result': True})
-	else:
-	    return gluon.contrib.simplejson.dumps({'result': False})
+        if not user.id == None:
+            return gluon.contrib.simplejson.dumps({'result': user})
+            #return returnResultTrue()
+        else:
+            return returnResultFalse()
     else:
         raise HTTP(409, 'username exists')
 
@@ -43,91 +43,120 @@ def login():
 
     user = auth.login_bare(username,password)
     if not user:
-        return gluon.contrib.simplejson.dumps({'result': user})
-    return gluon.contrib.simplejson.dumps({'result': True})
+        return gluon.contrib.simplejson.dumps({'result': False})
+    return returnUser(user)
 
 def loginfailed(*args):
     raise HTTP(409, 'autorization failed') 
 
 auth.settings.on_failed_authentication = loginfailed
 
-def verifyUser():
-    username = request.vars['username']
+def verifyuser():
+    username = request.vars.username
     user = db(db.auth_user.username == username).select()
     import gluon.contrib.simplejson
     try:
         user[0]
-        return gluon.contrib.simplejson.dumps({'result': True})
+        return returnUser(user[0])
     except:
-        return gluon.contrib.simplejson.dumps({'result': False})
+        return returnResultFalse()
 
-def verifyUserEmail():
-    useremail = request.vars['useremail']
+def verifyuseremail():
+    useremail = request.vars.useremail
     user = db(db.auth_user.email == useremail).select()
     import gluon.contrib.simplejson
     try:
         user[0]
-        return gluon.contrib.simplejson.dumps({'result': True})
+        return returnUser(user[0])
     except:
-        return gluon.contrib.simplejson.dumps({'result': False})
+        return returnResultFalse()
 
 @auth.requires_login()
 def addvedioboard():
     user = auth.user
     board_name = request.vars.name
-    icon = int(request.vars.icon)
+    icon = int(request.vars.board_icon_id)
     try:
         db.video_board.insert(board_name = board_name, user_d = user, icon_id = icon)
-        return gluon.contrib.simplejson.dumps({'result': True})
+        return returnResultTrue()
     except:
-        return gluon.contrib.simplejson.dumps({'result': False})
+        return returnResultFalse()
 
 @auth.requires_login()
 def addvideo():
     user = auth.user
-    name = request.vars.name
-    fileid = request.vars.fileid
+    name = request.vars.video_title
     thumbnail = request.vars.thumbnail
-    tags = json.loads(request.vars.tags)
+    video = request.vars.video
+    
+    tags = gluon.contrib.simplejson.loads(request.vars.tags)
 
-    try:
-        db.video.insert(name = name, thumbnail = thumbnail, user_d = user, fileid = fileid)
-        return gluon.contrib.simplejson.dumps({'user': auth.user.username, 'result': True, 'name':name, 'fileid':fileid, 'thumbnail':thumbnail})
-    except:
-        return gluon.contrib.simplejson.dumps({'user': auth.user.username, 'result': False, 'name':name, 'fileid':fileid, 'thumbnail':thumbnail})
+    #try:
+    video = db.video.insert(name = name, user_d = user, thumbnail = db.video.thumbnail.store(thumbnail.file, thumbnail.filename), \
+                                thumbnail_blob = thumbnail.file.read(), video = db.video.video.store(video.file, video.filename), video_blob = video.file.read())
+    '''
+        for tag in tags:
+            t = tag.id
+            if t == -1:
+                t = db.tag.insert(name = tag.text)
+            db.tag.insert(tag = t, video = video)
+    '''
+    return returnResultTrue()
+    #except:
+    #    return returnResultFalse()
 
-@service.jsonrpc
+
+@auth.requires_login()
 def markfavorite():
     user = auth.user
     video = request.vars.videoid
+    state = request.vars.favorite
     try:
-        db.favrioute.insert(vedio, user = user)
-        return {'user': auth.user, 'result': True}
+        if not state:
+            record = db((db.favrioute.user_d == user) & (db.favrioute.video == video)).delete()
+        else:
+            db.favrioute.insert(vedio, user = user)
+        return returnResultTrue()
     except:
-        return {'result': False}
+        return returnResultFalse()
+
+@auth.requires_login()
+def getmyvideos():
+    user = auth.user
+
+    videos = [v.id for v in db(db.video.user_d == user).select()]
+    return getVideo(videos, user)
+
 
 @auth.requires_login()
 def addvideotoboard():
     user = auth.user
-    board = request.vars.boardid
-    video = request.vars.videoid
-    try:
-        board = db((db.video_board.user_d == user) & (db.video_board.board_name == board)).select()[0]
-        video = db((db.video.user_d == user) & (db.video.id == video)).select()[0]
-        db.video_board_item.insert(video_board = board, video = video)
-        return gluon.contrib.simplejson.dumps({'result': True})
-    except:
-        return gluon.contrib.simplejson.dumps({'result': False})
+    board = request.vars.board_id
+    video = request.vars.video_id
+    #try:
+    board = db(db.video_board.id == board).select()[0]
+    video = db(db.video.id == video).select()[0]
+    db.video_board_item.insert(video_board = board, video = video)
+    return gluon.contrib.simplejson.dumps({'result': True})
+    #except:
+    #    return gluon.contrib.simplejson.dumps({'result': False})
 
 @auth.requires_login()
-def getboards():
+def getuserboards():
     user = auth.user
-    try:
-        row = db(db.video_board.user_d == user).select()
-        return gluon.contrib.simplejson.dumps({'boardlist':[{'id': r.id, 'name': r.board_name, 'iconid': r.icon_id} for r in row]})
-    except:
-        return gluon.contrib.simplejson.dumps({'result': False})
+    #try:
+    row = db(db.video_board.user_d == user).select()
+    return gluon.contrib.simplejson.dumps({'board_list':[{'board_id': r.id, 'board_name': r.board_name, 'username': r.user_d, 'board_icon_id': r.icon_id} for r in row]})
+    #except:
+    #    return gluon.contrib.simplejson.dumps({'result': False})
 
+'''
+def getboardvideos():
+    board = int(request.vars.boardid)
+    try:
+        row = db(db.video_board_item.video_board == board).select()
+'''
+'''
 @service.jsonrpc
 def addtag(tag, vedio):
     try:
@@ -137,3 +166,4 @@ def addtag(tag, vedio):
         return {'result': True}
     except:
         return {'result': False}
+'''
